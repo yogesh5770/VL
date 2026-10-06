@@ -1,0 +1,198 @@
+================================================================================
+EXPERIMENT 4a: INSTALLATION OF CITRIX XENSERVER
+EXPERIMENT 4b: LIVE MIGRATION OF VIRTUAL MACHINES USING XENCENTER
+================================================================================
+
+AIM:
+To install and configure Citrix XenServer as a Type-1 bare-metal hypervisor on physical
+servers, deploy and manage virtual machines graphically using XenCenter, and execute
+Live Migration of an active, running virtual machine between physical hosts with zero downtime.
+
+--------------------------------------------------------------------------------
+THEORETICAL FOUNDATION & ARCHITECTURE:
+--------------------------------------------------------------------------------
+1. What is Xen?
+   Xen is an open-source Type 1 (bare-metal) hypervisor running directly on physical hardware.
+   It creates an abstraction layer that permits multiple guest operating systems to share hardware.
+   - Dom0 (Domain 0): The initial privileged virtual machine created by the hypervisor at boot.
+     It has direct access to physical hardware drivers and manages all other guest VMs.
+   - DomU (Domain U): Unprivileged guest virtual machines running user applications.
+
+2. Virtualization Modes:
+   - Paravirtualization (PV): Guest operating systems are modified with hypercalls to interact
+     efficiently with the hypervisor without hardware CPU virtualization extensions.
+   - Hardware-assisted Full Virtualization (HVM): Relies on Intel VT-x or AMD-V extensions.
+     Enables unmodified guest operating systems (e.g., Microsoft Windows) to execute directly.
+
+3. Type 1 vs Type 2 Hypervisors:
+   +-------------------+-----------------------------------+-----------------------------------+
+   | Feature           | Type 1 Hypervisor (Bare-Metal)    | Type 2 Hypervisor (Hosted)        |
+   +-------------------+-----------------------------------+-----------------------------------+
+   | Location          | Directly on physical hardware     | Inside Host Operating System      |
+   | Performance       | Near-native (ultra-low overhead)  | Lower (overhead of host OS)       |
+   | Security          | High (minimal attack surface)     | Dependent on host OS security     |
+   | Enterprise Use    | Production datacenters & clouds   | Development, testing, desktop use |
+   | Examples          | Citrix XenServer, VMware ESXi,    | Oracle VirtualBox, VMware         |
+   |                   | KVM, Microsoft Hyper-V            | Workstation, Parallels            |
+   +-------------------+-----------------------------------+-----------------------------------+
+
+4. Citrix XenServer vs XenCenter:
+   +-------------------+-----------------------------------+-----------------------------------+
+   | Feature           | Citrix XenServer                  | Citrix XenCenter                  |
+   +-------------------+-----------------------------------+-----------------------------------+
+   | Role              | Hypervisor OS (Server side)       | Management GUI Client (Desktop)   |
+   | Runs On           | Bare-metal server hardware        | Windows Desktop Workstation       |
+   | Purpose           | Runs, hosts, and executes VMs     | Manages, configures, monitors VMs |
+   | Access            | CLI / Text Console / XenAPI       | Graphical User Interface (GUI)    |
+   +-------------------+-----------------------------------+-----------------------------------+
+
+5. Prerequisites / Requirements for Live Migration:
+   - Shared Storage (NFS, iSCSI, Fibre Channel SAN): Both XenServer hosts must access the
+     identical virtual disk repository so only memory pages need to be transferred over the network.
+   - Compatible CPUs: Both physical hosts must have compatible CPU architectures (same vendor:
+     Intel-to-Intel or AMD-to-AMD) to prevent instruction fault.
+   - High-Speed Network: Dedicated low-latency Gigabit/10GbE network connection between hosts.
+   - Citrix VM Tools (XenTools): Installed inside the guest operating system for state coordination.
+   - Pooled Hosts: Hosts are typically organized within a common Citrix XenServer Resource Pool.
+
+--------------------------------------------------------------------------------
+STEP-BY-STEP PROCEDURE (4a - INSTALLATION OF CITRIX XENSERVER):
+--------------------------------------------------------------------------------
+
+STEP 1: Prepare Bootable Installation Media
+1. Download official Citrix XenServer / Citrix Hypervisor ISO image.
+2. Use Rufus (or Ventoy) on Windows to create a bootable USB drive:
+   - Partition scheme: MBR / GPT (matching target server BIOS/UEFI).
+   - Write in DD Image mode if prompted.
+
+STEP 2: Configure Server BIOS / UEFI
+1. Power on the physical server and enter BIOS setup (press F2, F10, F12, or Del).
+2. Enable Hardware Virtualization:
+   - Intel: "Intel Virtualization Technology" (VT-x) -> Enabled.
+   - AMD: "AMD-V" / "SVM Mode" -> Enabled.
+3. Enable Intel VT-d / AMD IOMMU if available.
+4. Set Boot Priority to boot from the XenServer USB flash drive first. Save & Exit.
+
+STEP 3: Execute XenServer Installation
+1. Boot from the USB installer. At the splash screen, press Enter to begin.
+2. Select keyboard layout (US) -> Accept End User License Agreement (EULA).
+3. Select Primary Disk: Choose the local hard drive/SSD for XenServer OS installation.
+4. Select Installation Source: Choose "Local Media" (USB/CD-ROM).
+5. Skip Supplemental Packs (or click No).
+6. Verify Installation Media: Select "Skip Verification" to proceed quickly.
+7. Set Root Password: Enter and confirm a strong administrative password for `root`.
+8. Networking Configuration:
+   - Select management network interface (e.g., eth0).
+   - Choose "Static configuration":
+     * IP Address: 192.168.1.50 (Host 1) / 192.168.1.51 (Host 2)
+     * Subnet Mask: 255.255.255.0
+     * Gateway: 192.168.1.1
+     * DNS: 8.8.8.8
+9. Hostname & Timezone:
+   - Hostname: xenserver-01
+   - Time Zone: Select your geographic region.
+   - Time Configuration: NTP (Network Time Protocol) or Manual.
+10. Confirm and click "Install XenServer". Wait for files to write.
+11. Eject installation media and select "Reboot".
+
+STEP 4: Verify Installation
+Upon boot, XenServer loads the text-based console (xsconsole):
+It displays Server Name, Management IP (e.g., 192.168.1.50), Memory, and Network status.
+
+--------------------------------------------------------------------------------
+STEP-BY-STEP PROCEDURE (4b - LIVE MIGRATION USING XENCENTER):
+--------------------------------------------------------------------------------
+
+STEP 1: Install and Launch XenCenter on Management PC
+1. On a Windows workstation connected to the same network, install Citrix XenCenter.
+2. Launch XenCenter from Desktop / Start Menu.
+
+STEP 2: Connect Both XenServer Physical Hosts to XenCenter
+1. In XenCenter menu bar, click "Server" -> "Add" (or press Ctrl + Shift + A).
+2. For Host 1:
+   - Server: Enter Host 1 IP (e.g., 192.168.1.50)
+   - User name: root
+   - Password: <Host 1 root password>
+   - Click "Add".
+3. For Host 2:
+   - Click "Server" -> "Add".
+   - Server: Enter Host 2 IP (e.g., 192.168.1.51)
+   - User name: root
+   - Password: <Host 2 root password>
+   - Click "Add".
+4. Both servers will now display in the left navigation tree.
+
+STEP 3: Attach Shared Storage Repository (SR)
+1. Select Host 1 or create a Resource Pool containing Host 1 and Host 2.
+2. Click "Storage" -> "New SR" (New Storage Repository).
+3. Type: Select "NFS VHD" or "Software iSCSI". Click "Next".
+4. Name: Enter "Shared_NFS_Storage". Click "Next".
+5. Share Name: Enter `<NFS_Server_IP>:/exported_share` (e.g., `192.168.1.100:/srv/nfs`).
+6. Click "Finish". The shared storage connects and displays a green checkmark on both hosts.
+
+STEP 4: Create and Provision a Virtual Machine
+1. Right-click Host 1 -> Select "New VM...".
+2. Template: Select "Ubuntu Focal Fossa 20.04" (or generic Linux / Windows).
+3. Name: Enter VM name, e.g., "Live_Migration_VM".
+4. Installation Media: Select ISO image from shared ISO library.
+5. Storage: Select the "Shared_NFS_Storage" repository created in Step 3.
+6. Memory & CPU: Allocate 2 vCPUs, 2048 MB RAM.
+7. Network: Connect to the virtual network adapter.
+8. Click "Create Now".
+9. Power ON the VM, complete OS installation, and install "XenServer Tools" (XenTools).
+
+STEP 5: Initiate Live Workload for Verification
+1. Open the "Console" tab of the running VM inside XenCenter.
+2. Start an ongoing network ping:
+   $ ping 8.8.8.8
+   (Or run a continuous counter loop in terminal to visually verify zero freeze).
+
+STEP 6: Perform Live Migration
+1. In the XenCenter left panel, right-click the running "Live_Migration_VM" under Host 1.
+2. Click "Move VM..." (or "Migrate to Server").
+3. In the migration wizard:
+   - Target Host: Select "xenserver-02" (Host 2 - 192.168.1.51).
+   - Storage: Leave on existing shared storage repository.
+4. Click "Finish" / "Move".
+
+STEP 7: Observe and Verify Live Migration Progress
+1. Watch the XenCenter bottom "Logs / Notifications" tab:
+   - Phase 1: Pre-copy memory pages (iterative transfer of dirty memory pages).
+   - Phase 2: Final brief memory delta synchronization (fractions of a millisecond).
+   - Phase 3: CPU register state handoff to Host 2.
+   - Phase 4: Network ARP packet broadcast so physical switches redirect traffic to Host 2.
+2. The VM will now be listed under Host 2 with a Green Running icon.
+3. Check the VM console: The ping output continues streaming without any dropped packets!
+
+--------------------------------------------------------------------------------
+VIVA VOCE QUESTIONS & ANSWERS:
+--------------------------------------------------------------------------------
+Q1: How does Live Migration achieve zero downtime?
+A1: Through Pre-Copy Memory Migration:
+While the VM continues running on the source host, the hypervisor copies memory pages to the
+destination host over the network. Modified ("dirty") pages are re-copied in successive iterations.
+When dirty pages are sufficiently minimal, execution is paused for milliseconds, the CPU state is
+transferred, and the VM resumes execution seamlessly on the destination host.
+
+Q2: Why is Shared Storage essential for standard Live Migration?
+A2: Virtual machine disk files (tens or hundreds of gigabytes) take substantial time to transfer.
+By keeping the disk on shared storage (NFS/iSCSI/SAN), both hosts can access the identical storage
+simultaneously, requiring only volatile RAM and CPU registers to be migrated across the network.
+
+Q3: What is the purpose of Dom0 in Xen architecture?
+A3: Dom0 is the primary privileged management domain created automatically at boot. It possesses
+direct access to physical hardware devices, device drivers, and controls hypervisor operations
+(creating, starting, pausing, migrating, and destroying DomU guest domains).
+
+Q4: What is the difference between Paravirtualization (PV) and Full Virtualization (HVM)?
+A4:
+- PV: Guest OS kernel is modified to make hypercalls directly to the Xen hypervisor; does not require CPU hardware virtualization support.
+- HVM: Guest OS runs completely unmodified using CPU hardware virtualization extensions (Intel VT-x / AMD-V); emulates virtual BIOS, motherboard, and peripheral chipsets.
+
+--------------------------------------------------------------------------------
+RESULT:
+--------------------------------------------------------------------------------
+Citrix XenServer Type-1 hypervisor was installed and configured on physical hardware.
+Virtual machines were managed using XenCenter GUI, and Live Migration was successfully
+executed from Host 1 to Host 2 with zero downtime and continuous network availability.
+================================================================================

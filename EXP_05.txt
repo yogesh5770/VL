@@ -1,0 +1,237 @@
+================================================================================
+EXPERIMENT 5a: INSTALLATION OF KVM & CREATION OF VIRTUAL INSTANCES
+EXPERIMENT 5b: KVM - CREATE DISK IMAGES FROM ISO, IMAGE RESIZING, & CONVERSION
+================================================================================
+
+--------------------------------------------------------------------------------
+PART 1: EXPERIMENT 5a
+--------------------------------------------------------------------------------
+AIM:
+To install Kernel-based Virtual Machine (KVM) and libvirt virtualization infrastructure
+on a Linux operating system, verify hardware virtualization capabilities, and create
+and manage virtual machine instances using both the command-line utility (virsh) and
+the graphical Virtual Machine Manager (virt-manager).
+
+CORE CONCEPTS:
+- What is KVM?
+  KVM (Kernel-based Virtual Machine) is a full virtualization solution integrated directly into
+  the Linux kernel (via loadable kernel modules `kvm.ko` and `kvm-intel.ko` / `kvm-amd.ko`).
+  It turns the Linux kernel into a Type-1 hypervisor.
+- Component Ecosystem:
+  * QEMU (Quick EMUlator): Emulates hardware peripherals (disks, network cards, graphics).
+  * libvirt: An abstraction API, daemon (`libvirtd`), and management toolset.
+  * virsh: Shell interface to control and configure domains (VMs) via libvirt.
+  * virt-manager: Desktop GUI client for creating and monitoring KVM instances.
+
+KVM BENEFITS SUMMARY:
++-------------------+-----------------------------------------------------------------+
+| Feature           | Benefit                                                         |
++-------------------+-----------------------------------------------------------------+
+| Open Source       | Freely available and maintained by the global Linux community.   |
+| Performance       | Near bare-metal execution speed using CPU hardware extensions.  |
+| Security          | Isolated execution via Linux SELinux (sVirt) and AppArmor.       |
+| Scalability       | Supports hundreds of VMs and high vCPU/RAM allocation limits.   |
+| Image Formats     | Native support for thin-provisioned, copy-on-write QCOW2 files. |
+| Live Migration    | Seamless live migration of running guests between hosts.        |
++-------------------+-----------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+STEP-BY-STEP PROCEDURE (5a - INSTALLATION & VM CREATION):
+--------------------------------------------------------------------------------
+
+STEP 1: Verify Hardware Virtualization Support
+Open Terminal on Linux:
+1. Check CPU virtualization flags (VMX for Intel, SVM for AMD):
+   $ egrep -c '(vmx|svm)' /proc/cpuinfo
+   * If output >= 1: Your CPU supports hardware virtualization.
+   * If output == 0: CPU lacks virtualization support or VT-x is disabled in BIOS.
+
+2. Check kernel and OS specifications:
+   $ uname -a
+
+3. Verify KVM acceleration compatibility (optional utility):
+   $ sudo apt install -y cpu-checker
+   $ kvm-ok
+   * Expected: "INFO: /dev/kvm exists. KVM acceleration can be used"
+
+STEP 2: Install KVM, QEMU, libvirt, and Virt-Manager
+Run the following package installation command:
+$ sudo apt update
+$ sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager qemu-utils
+
+STEP 3: Configure Permissions and Enable libvirtd Service
+1. Enable and start the libvirt daemon:
+   $ sudo systemctl enable --now libvirtd
+   $ sudo systemctl status libvirtd
+
+2. Add your current user account to the `libvirt` and `kvm` groups:
+   $ sudo usermod -aG libvirt $USER
+   $ sudo usermod -aG kvm $USER
+
+3. Verify KVM kernel module is loaded:
+   $ lsmod | grep kvm
+   * Output should show: kvm and kvm_intel (or kvm_amd).
+
+STEP 4: Verify Command-Line Management (virsh)
+1. Check connected hypervisor version:
+   $ virsh version
+2. Inspect physical host node information:
+   $ virsh nodeinfo
+3. List active virtual machines:
+   $ virsh list --all
+
+STEP 5: Create a Virtual Instance (CirrOS Cloud Image)
+Option A: Using GUI (virt-manager)
+1. Download a lightweight test image (CirrOS):
+   $ wget https://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img
+2. Launch Virtual Machine Manager:
+   $ virt-manager
+3. In Virt-Manager:
+   - Click "File" -> "New Virtual Machine" (or click the top-left PC icon).
+   - Select "Import existing disk image" -> Click "Forward".
+   - Click "Browse..." -> "Browse Local" -> Select the downloaded `cirros-0.5.1-x86_64-disk.img`.
+   - OS Type: Choose "Generic default" (or Linux).
+   - Memory (RAM): 512 MB | CPUs: 1 -> Click "Forward".
+   - Name: `cirros-test-vm`.
+   - Click "Finish".
+4. The VM console opens immediately. Log in with user: `cirros`, password: `cubswin:)`.
+
+Option B: Using Command Line (virt-install)
+$ virt-install \
+  --name cirros-cli-vm \
+  --ram 512 \
+  --vcpus 1 \
+  --disk path=./cirros-0.5.1-x86_64-disk.img,format=qcow2 \
+  --import \
+  --os-variant generic \
+  --network network=default \
+  --graphics spice
+
+
+================================================================================
+PART 2: EXPERIMENT 5b
+================================================================================
+AIM:
+To create virtual disk images from ISO files, perform online/offline image resizing
+using `qemu-img` and filesystem resize utilities (`growpart`, `resize2fs`), and execute
+disk format conversion between QCOW2, RAW, VDI, and VHD.
+
+DISK FORMAT OVERVIEW:
+- QCOW2 (QEMU Copy On Write 2): Efficient, dynamically expanding disk format supporting
+  internal snapshots, AES encryption, and zlib compression. Standard for KVM.
+- RAW (.img / .raw): Unstructured flat byte stream. Highest I/O performance, but occupies
+  full allocated space on non-sparse filesystems and lacks native snapshotting.
+- VDI: VirtualBox native virtual disk image format.
+- VHD / VPC: Microsoft Virtual Hard Disk format (Hyper-V / Azure).
+
+--------------------------------------------------------------------------------
+STEP-BY-STEP PROCEDURE (5b):
+--------------------------------------------------------------------------------
+
+STEP 1: Create a QCOW2 Virtual Disk Image
+Create a 10 GB dynamically expanding virtual hard disk:
+$ qemu-img create -f qcow2 ubuntu_vm.qcow2 10G
+
+Verify image creation and metadata:
+$ qemu-img info ubuntu_vm.qcow2
+* Observe:
+  - file format: qcow2
+  - virtual size: 10 GiB (10737418240 bytes)
+  - disk size: 196 KiB (actual physical space occupied on host)
+
+STEP 2: Deploy VM from ISO onto the QCOW2 Disk
+Using CLI (virt-install):
+$ virt-install \
+  --name ubuntu-server-vm \
+  --ram 2048 \
+  --vcpus 2 \
+  --disk path=./ubuntu_vm.qcow2,format=qcow2 \
+  --cdrom /path/to/ubuntu-20.04-live-server-amd64.iso \
+  --os-variant ubuntu20.04 \
+  --network network=default
+
+STEP 3: Virtual Disk Image Resizing
+Suppose the 10 GB disk space is insufficient and needs expansion to 15 GB (+5 GB):
+
+1. Shut down the virtual machine:
+   $ virsh shutdown ubuntu-server-vm
+   (Verify state is 'shut off'):
+   $ virsh domstate ubuntu-server-vm
+
+2. Resize the underlying QCOW2 disk using `qemu-img`:
+   $ qemu-img resize ubuntu_vm.qcow2 +5G
+   (Or specify new total capacity: `qemu-img resize ubuntu_vm.qcow2 15G`)
+
+3. Verify expanded virtual disk capacity on the host:
+   $ qemu-img info ubuntu_vm.qcow2
+   * Virtual size will now display: 15 GiB.
+
+4. Expand the partition and filesystem inside the guest VM:
+   Start the VM and log in:
+   $ virsh start ubuntu-server-vm
+   $ virsh console ubuntu-server-vm
+
+   Inside the guest VM terminal:
+   - Check current partition layout:
+     $ sudo lsblk
+     $ df -h /
+   - Install cloud-guest-utils (if growpart is missing):
+     $ sudo apt update && sudo apt install -y cloud-guest-utils
+   - Extend partition 1 on disk /dev/sda:
+     $ sudo growpart /dev/sda 1
+   - Resize the ext4 filesystem to consume the new partition space:
+     $ sudo resize2fs /dev/sda1
+   - Verify expanded storage:
+     $ df -h /
+
+STEP 4: Virtual Disk Image Format Conversion
+The `qemu-img convert` command converts between various hypervisor disk formats.
+
+1. Convert QCOW2 to RAW format (.img / .raw):
+   $ qemu-img convert -f qcow2 -O raw ubuntu_vm.qcow2 ubuntu_vm.raw
+   Verify:
+   $ qemu-img info ubuntu_vm.raw
+
+2. Convert QCOW2 to VirtualBox VDI format (.vdi):
+   $ qemu-img convert -f qcow2 -O vdi ubuntu_vm.qcow2 ubuntu_vm.vdi
+   Verify:
+   $ qemu-img info ubuntu_vm.vdi
+
+3. Convert QCOW2 to Microsoft Hyper-V VHD format (.vhd / vpc):
+   $ qemu-img convert -f qcow2 -O vpc ubuntu_vm.qcow2 ubuntu_vm.vhd
+   Verify:
+   $ qemu-img info ubuntu_vm.vhd
+
+4. List and compare converted files on host:
+   $ ls -lh ubuntu_vm.*
+
+--------------------------------------------------------------------------------
+VIVA VOCE QUESTIONS & ANSWERS:
+--------------------------------------------------------------------------------
+Q1: What is the difference between QEMU and KVM?
+A1: KVM is a kernel module that provides CPU and memory hardware virtualization. QEMU is a user-space
+emulator that emulates PC hardware devices (storage controllers, network interfaces, PCI buses, graphics).
+Together (qemu-kvm), they provide a complete, ultra-fast Type-1 hypervisor solution.
+
+Q2: What is the advantage of QCOW2 over RAW format?
+A2: QCOW2 features dynamic allocation (only consumes physical disk space as data is written), native
+copy-on-write snapshots, compression, and optional encryption. RAW is a fixed allocation format without
+native snapshot capabilities, though RAW has slightly higher direct I/O throughput.
+
+Q3: Which command line tool is used to manage KVM guests without a graphical interface?
+A3: `virsh` (Virtual Shell). Common commands include: `virsh list --all`, `virsh start <vm>`,
+`virsh shutdown <vm>`, `virsh destroy <vm>`, `virsh undefine <vm>`, and `virsh edit <vm>`.
+
+Q4: Can you shrink a virtual disk image using qemu-img resize?
+A4: While `qemu-img resize --shrink` is technically possible, shrinking virtual disks carries severe risk
+of irreversible data corruption unless the filesystem and partition inside the guest are strictly shrunk
+first using `resize2fs` and `fdisk`/`parted`.
+
+--------------------------------------------------------------------------------
+RESULT:
+--------------------------------------------------------------------------------
+KVM virtualization subsystem was successfully installed and verified on Linux.
+Virtual machine instances were launched using Virt-Manager and virsh. QCOW2 virtual disk
+images were created from ISO, resized using qemu-img with guest filesystem expansion,
+and converted across RAW, VDI, and VHD formats successfully.
+================================================================================
