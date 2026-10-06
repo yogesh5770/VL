@@ -1,0 +1,113 @@
+================================================================================
+EXPERIMENT 7a: CONFIGURATION OF HYPER-V ON WINDOWS
+EXPERIMENT 7b: VM CREATION & MANAGEMENT USING POWERSHELL COMMANDS
+================================================================================
+
+AIM:
+1. To enable and configure Microsoft Hyper-V on Windows Server / Windows 10/11.
+2. To create, manage, and automate Virtual Machines using both the graphical Hyper-V Manager
+   and Windows PowerShell commands (Get-VM, Start-VM, Stop-VM).
+
+WHAT IS HYPER-V?
+Hyper-V is Microsoft's Type-1 (Bare-Metal) hypervisor built directly into Windows Pro, Enterprise,
+and Windows Server. It lets you run multiple Windows and Linux virtual machines at the same time.
+
+--------------------------------------------------------------------------------
+PART 1: EXPERIMENT 7a - ENABLING HYPER-V ON WINDOWS
+--------------------------------------------------------------------------------
+
+METHOD A: USING SERVER MANAGER (ON WINDOWS SERVER)
+1. Open Start Menu -> Open "Server Manager".
+2. Click "Manage" (top right) -> Click "Add Roles and Features".
+3. Click "Next" -> Installation Type: "Role-based or feature-based installation" -> Click "Next".
+4. Server Selection: Select your server -> Click "Next".
+5. In "Server Roles" list:
+   - Check the box for "Hyper-V".
+   - A popup will ask to add features -> Click "Add Features".
+6. Virtual Switches:
+   - Check your network adapter (Ethernet / VirtualBox Host-Only Adapter) to allow internet to VMs.
+7. Migration:
+   - Check "Allow this server to send and receive live migrations of VMs".
+   - Authentication: Choose "Use Credential Security Support Provider (CredSSP)".
+8. Default Stores: Click Next (leave default paths).
+9. Confirmation: Check "Restart the destination server automatically if required" -> Click "Install".
+10. The system installs Hyper-V and restarts.
+
+METHOD B: QUICK POWERSHELL ENABLE (FASTEST WAY!)
+Open PowerShell as Administrator on Windows and run:
+   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
+-> Type 'Y' to restart your computer. Hyper-V is ready!
+
+--------------------------------------------------------------------------------
+PART 2: EXPERIMENT 7b - VM CREATION USING HYPER-V MANAGER (GUI)
+--------------------------------------------------------------------------------
+1. Open Start Menu -> Search and open "Hyper-V Manager".
+2. In left panel, click on your computer name (Server).
+3. In right panel, click "New" -> "Virtual Machine...".
+4. Follow the easy wizard:
+   - Name: Enter `My_HyperV_VM` -> Click Next.
+   - Generation: Choose "Generation 1" (or Generation 2) -> Click Next.
+   - Memory (RAM): Enter `2048 MB` (2 GB) -> Click Next.
+   - Networking: Connection -> Select your Virtual Switch -> Click Next.
+   - Virtual Hard Disk: Choose "Create a virtual hard disk" (Size: 20 GB) -> Click Next.
+   - Installation Options: Choose "Install an operating system from a bootable image file"
+     -> Browse and select your Ubuntu or Windows ISO file.
+5. Click "Finish".
+6. In Hyper-V Manager: Right-click `My_HyperV_VM` -> Click "Connect..." -> Click the green "Start" button!
+
+--------------------------------------------------------------------------------
+PART 3: EXPERIMENT 7b - POWERSHELL COMMANDS (SHOW THIS TO EXAMINER!)
+--------------------------------------------------------------------------------
+Examiners love PowerShell automation. Open PowerShell as Administrator and run these:
+
+STEP 1: Create a 20 GB Virtual Hard Disk
+   New-VHD -Path "C:\HyperV\my_disk.vhdx" -SizeBytes 20GB -Dynamic
+
+STEP 2: Create a New Virtual Machine via PowerShell
+   New-VM -Name "PS_Ubuntu_VM" -MemoryStartupBytes 2GB -VHDPath "C:\HyperV\my_disk.vhdx" -SwitchName "Default Switch"
+
+STEP 3: Attach an ISO file to the VM
+   Set-VMDvdDrive -VMName "PS_Ubuntu_VM" -Path "C:\ISOs\ubuntu-20.04.iso"
+
+STEP 4: View all Virtual Machines (Management)
+   Get-VM
+-> Shows list of VMs with Name, State (Off), CPUUsage, Memory, Uptime.
+
+STEP 5: Turn ON the Virtual Machine
+   Start-VM -Name "PS_Ubuntu_VM"
+
+Verify it is running:
+   Get-VM
+-> Shows State: Running!
+
+STEP 6: Turn OFF / Shut down the Virtual Machine
+   Stop-VM -Name "PS_Ubuntu_VM"
+   (Or forceful turn off):
+   Stop-VM -Name "PS_Ubuntu_VM" -TurnOff
+
+STEP 7: Live Move / Migration of VM
+In Hyper-V Manager:
+   Right-click `PS_Ubuntu_VM` -> Click "Move..." -> Choose "Move the virtual machine to another computer"
+   -> Type destination server name -> Click Finish.
+
+--------------------------------------------------------------------------------
+SUPER SIMPLE VIVA QUESTIONS:
+--------------------------------------------------------------------------------
+Q1: Is Hyper-V a Type-1 or Type-2 Hypervisor?
+A: Hyper-V is a Type-1 (Bare-Metal) hypervisor. When enabled, the Windows OS itself runs as a root partition on top of the hypervisor.
+
+Q2: What is the file extension used for Hyper-V virtual hard disks?
+A: `.vhd` (older format up to 2TB) and `.vhdx` (modern format up to 64TB with power-failure protection).
+
+Q3: What PowerShell command lists all virtual machines in Hyper-V?
+A: `Get-VM`.
+
+Q4: How do you start and stop a VM in PowerShell?
+A: `Start-VM -Name <VM_Name>` and `Stop-VM -Name <VM_Name>`.
+
+--------------------------------------------------------------------------------
+RESULT:
+--------------------------------------------------------------------------------
+Hyper-V was successfully configured on Windows. Virtual machines were created and managed
+using both Hyper-V Manager GUI and PowerShell cmdlets (New-VM, Get-VM, Start-VM, Stop-VM) without errors.
+================================================================================

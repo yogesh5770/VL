@@ -1,0 +1,150 @@
+================================================================================
+EXPERIMENT 8: INSTALLATION OF OPENSTACK (DEVSTACK) & VM CREATION
+================================================================================
+
+AIM:
+To install OpenStack using DevStack on a Linux (Ubuntu) system and deploy, manage,
+and connect to a Virtual Machine using the OpenStack Command-Line Interface (CLI).
+
+WHAT IS OPENSTACK?
+OpenStack is an open-source Cloud Operating System that manages pools of compute,
+storage, and networking resources across a datacenter (like your own private AWS Cloud!).
+
+WHAT ARE THE KEY OPENSTACK SERVICES? (VERY IMPORTANT FOR VIVA!)
+- Keystone : Identity & Authentication (User login)
+- Nova     : Compute service (Creates and manages Virtual Machines)
+- Glance   : Image service (Stores OS images like CirrOS, Ubuntu)
+- Neutron  : Networking service (Virtual switches, routers, subnets)
+- Horizon  : Web-based GUI Dashboard
+- Cinder   : Block Storage (Virtual hard disks)
+
+WHAT IS DEVSTACK?
+DevStack is an automated script used to deploy a complete single-node OpenStack cloud
+environment quickly for lab testing and development.
+
+--------------------------------------------------------------------------------
+STEP-BY-STEP PROCEDURE:
+--------------------------------------------------------------------------------
+
+STEP 1: UPDATE UBUNTU PACKAGES
+Open Terminal on Ubuntu and type:
+   sudo apt update && sudo apt upgrade -y
+   sudo apt install git -y
+
+STEP 2: CREATE DEDICATED 'STACK' USER WITH SUDO PRIVILEGES
+OpenStack requires a dedicated user named `stack`:
+1. Create the user:
+   sudo useradd -s /bin/bash -d /opt/stack -m stack
+
+2. Give passwordless sudo permission so the script does not ask for passwords:
+   echo "stack ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/stack
+
+3. Switch to the `stack` user:
+   sudo su - stack
+   (Notice: Your terminal prompt now shows `stack@...`)
+
+STEP 3: DOWNLOAD DEVSTACK FROM GIT
+1. Clone the DevStack repository from GitHub/OpenStack:
+   git clone https://opendev.org/openstack/devstack
+
+2. Move into the devstack directory:
+   cd devstack
+
+STEP 4: CREATE AND CONFIGURE 'local.conf'
+Create the configuration file:
+   nano local.conf
+
+Paste the following configuration inside the file (replace 192.168.56.103 with your Linux IP):
+--------------------------------------------------
+[[local|localrc]]
+ADMIN_PASSWORD=secret
+DATABASE_PASSWORD=secret
+RABBIT_PASSWORD=secret
+SERVICE_PASSWORD=secret
+HOST_IP=192.168.56.103
+--------------------------------------------------
+Save and Exit:
+- Press Ctrl + O
+- Press Enter
+- Press Ctrl + X
+
+STEP 5: RUN DEVSTACK SCRIPT TO BUILD OPENSTACK
+Start the automated installation:
+   ./stack.sh
+
+(Note: This script takes 15 to 20 minutes to download and configure OpenStack components).
+When finished, it displays:
+"This is your host IP: 192.168.56.103"
+"Horizon is now available at http://192.168.56.103/dashboard"
+
+STEP 6: ACCESS HORIZON DASHBOARD (GUI)
+1. Open your web browser and go to:
+   http://192.168.56.103/dashboard
+2. Login credentials:
+   - Domain: Default
+   - User Name: admin
+   - Password: secret
+3. You can see your live Cloud Dashboard!
+
+STEP 7: CREATE A VIRTUAL MACHINE USING OPENSTACK CLI (TERMINAL)
+Inside the `stack` user terminal:
+
+1. Load OpenStack admin credentials into your shell session:
+   source openrc admin admin
+
+2. View available Operating System Images (Glance service):
+   openstack image list
+   -> Note down the image name: e.g. `cirros-0.5.2-x86_64-disk`
+
+3. View available hardware sizes (Nova Flavor service):
+   openstack flavor list
+   -> Note down the flavor: e.g. `m1.tiny` (1 vCPU, 512 MB RAM, 1 GB disk)
+
+4. Create an SSH Key-Pair to connect to the VM:
+   openstack keypair create mykey > mykey.pem
+   chmod 600 mykey.pem
+
+5. View available Virtual Networks (Neutron service):
+   openstack network list
+   -> Note down the network name or ID: e.g. `private` (or `shared`)
+
+6. Launch the Virtual Machine:
+   openstack server create --image cirros-0.5.2-x86_64-disk --flavor m1.tiny --nic net-id=private --key-name mykey my-first-vm
+
+7. Verify the VM is Active and Running:
+   openstack server list
+   -> You will see:
+   Name: my-first-vm | Status: ACTIVE | Networks: private=10.0.0.15
+
+8. Connect / Login to your new Cloud VM via SSH:
+   ssh -i mykey.pem cirros@10.0.0.15
+   -> You are inside your cloud VM instance!
+   Type `hostname` or `exit`.
+
+--------------------------------------------------------------------------------
+SUPER SIMPLE VIVA QUESTIONS:
+--------------------------------------------------------------------------------
+Q1: What is OpenStack?
+A: An open-source cloud computing platform for building private and public clouds (IaaS - Infrastructure as a Service).
+
+Q2: Match the service name with its function:
+A:
+- Nova    -> Compute (Virtual Machines)
+- Glance  -> Image service (OS images)
+- Neutron -> Networking (Routers, Switches, IPs)
+- Keystone-> Identity & Authentication (User logins)
+- Horizon -> Web GUI Dashboard
+- Cinder  -> Block Storage (Hard disks)
+
+Q3: What is the command to list all virtual machines in OpenStack?
+A: `openstack server list`.
+
+Q4: What is a "Flavor" in OpenStack?
+A: A Flavor defines the hardware size of a VM (how much vCPU, RAM, and disk space it gets, like m1.tiny or m1.small).
+
+--------------------------------------------------------------------------------
+RESULT:
+--------------------------------------------------------------------------------
+OpenStack (DevStack) was successfully installed on the Linux system. Virtual instances
+were provisioned, monitored, and accessed via the OpenStack CLI and Horizon Dashboard without errors.
+================================================================================
