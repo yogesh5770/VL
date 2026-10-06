@@ -1,245 +1,170 @@
 ================================================================================
-EXPERIMENT 2a: CREATING A VM & ALLOCATING STORAGE, MEMORY, AND NETWORK (VIRTUALBOX)
-               + BENCHMARK EXECUTION TIME (HOST VS VM)
-EXPERIMENT 2b: VM-TO-VM PING AND VM-TO-NATIVE (HOST) PING
+EXPERIMENT 2a: CREATE A VM, GIVE RAM/DISK/NETWORK & COMPARE JAVA SPEED
+EXPERIMENT 2b: PING TEST BETWEEN VM-TO-VM AND VM-TO-HOST
 ================================================================================
 
 --------------------------------------------------------------------------------
-PART 1: EXPERIMENT 2a
+PART 1: EXPERIMENT 2a - CREATE A VM AND ALLOCATE RESOURCES
 --------------------------------------------------------------------------------
+
 AIM:
-To create a Virtual Machine in Oracle VM VirtualBox, allocate Memory (RAM), Virtual
-Storage (HDD), and Network interfaces, and evaluate the execution time performance
-difference of a compute-intensive Java program between Host (Windows) and VM (Ubuntu).
-
-PREREQUISITES:
-1. Oracle VM VirtualBox installed on Windows Host.
-2. Ubuntu ISO file (e.g., Ubuntu 20.04/22.04 LTS).
-3. Java JDK installed on both Windows Host and Ubuntu VM.
+To create a Virtual Machine in Oracle VirtualBox, give it RAM, Hard Disk, and Network,
+and test if Windows (Host) runs a Java program faster than Ubuntu (Virtual Machine).
 
 --------------------------------------------------------------------------------
-STEP-BY-STEP PROCEDURE (2a - VM CREATION & CONFIGURATION):
+STEP-BY-STEP PROCEDURE (HOW TO CREATE VM):
 --------------------------------------------------------------------------------
+STEP 1: Create VM
+1. Open Oracle VM VirtualBox.
+2. Click the blue "New" button (star icon).
+3. Type Name: KESHO_2A (or your name).
+4. Type: Select "Linux".
+5. Version: Select "Ubuntu (64-bit)".
+6. Click "Next".
 
-STEP 1: Create New Virtual Machine
-1. Open Oracle VM VirtualBox Manager.
-2. Click on the "New" icon (or press Ctrl + N).
-3. Fill in the parameters:
-   - Name: VM_LAB_2A (or your roll number/name, e.g., KESHO_2A)
-   - Machine Folder: Default path (e.g., C:\Users\<Username>\VirtualBox VMs)
-   - Type: Linux
-   - Version: Ubuntu (64-bit)
-4. Click "Next".
-
-STEP 2: Allocate Memory (RAM)
-1. Set the Memory slider to: 2048 MB (2 GB) or 4096 MB (4 GB).
-   * Note: Do NOT allocate more than 50% of your physical host system RAM to prevent host freezing.
+STEP 2: Give RAM (Memory)
+1. Drag the slider to 2048 MB (2 GB) or 4096 MB (4 GB).
+   (Note: Keep in the green bar area, do not cross 50% of your laptop RAM).
 2. Click "Next".
 
-STEP 3: Configure Virtual Hard Disk (Storage)
-1. Select "Create a virtual hard disk now" (or "Use an existing virtual hard disk file" if already installed).
-2. Click "Create".
-3. Hard disk file type: Select "VDI (VirtualBox Disk Image)" -> Click "Next".
-4. Storage on physical hard disk: Select "Dynamically allocated" -> Click "Next".
-5. File location and size: Set disk size to at least 20 GB (or 25 GB).
-6. Click "Create".
+STEP 3: Give Hard Disk (Storage)
+1. Select "Create a virtual hard disk now" -> Click "Create".
+2. Choose "VDI (VirtualBox Disk Image)" -> Click "Next".
+3. Choose "Dynamically allocated" -> Click "Next".
+4. Set size to 20 GB (or 25 GB) -> Click "Create".
 
-STEP 4: Configure Network Adapter
-1. In VirtualBox Manager, select your newly created VM.
-2. Click "Settings" (or Ctrl + S) -> Go to "Network" tab.
-3. On "Adapter 1":
-   - Ensure "Enable Network Adapter" is CHECKED.
-   - Attached to: Select "Host-Only Adapter" (for isolated host+VM communication)
-     OR select "Bridged Adapter" (to obtain an IP on the local physical LAN/Wi-Fi).
-   - Name: "VirtualBox Host-Only Ethernet Adapter" (or physical Wi-Fi/Ethernet card if bridged).
-   - Promiscuous Mode: Allow VMs (or Allow All).
+STEP 4: Set Network Adapter
+1. Click your new VM -> Click "Settings" (gear icon).
+2. Click "Network" on left side.
+3. In Adapter 1:
+   - Check "Enable Network Adapter".
+   - Attached to: Choose "Host-only Adapter".
 4. Click "OK".
 
-STEP 5: Attach Installation Media and Boot
-1. Click "Settings" -> "Storage".
-2. Under "Storage Devices", select the empty optical drive icon under Controller: IDE/SATA.
-3. Click the disk icon on the right -> "Choose a disk file..." -> Select your Ubuntu ISO.
-4. Click "OK".
-5. Select the VM and click "Start" (Green arrow) to power on the VM.
+STEP 5: Add ISO File and Start
+1. In Settings -> Click "Storage".
+2. Under Storage Devices, click the round CD icon that says "Empty".
+3. On the right side, click the blue CD icon -> Choose "Choose a disk file...".
+4. Pick your Ubuntu ISO file -> Click "OK".
+5. Click the green "Start" arrow to turn on your VM.
 
 --------------------------------------------------------------------------------
-STEP-BY-STEP PROCEDURE (2a - JAVA BENCHMARK EXECUTION TIME):
+PART 2: RUN JAVA PROGRAM TO COMPARE SPEED (WINDOWS VS LINUX VM)
 --------------------------------------------------------------------------------
 
-AIM OF BENCHMARK:
-To measure and compare the CPU execution time for computing a heavy loop (sum of digits/numbers)
-between the bare-metal Windows Host and the virtualized Ubuntu Linux VM.
-
-JAVA SOURCE CODE (Save as Benchmark.java):
---------------------------------------------------------------------------------
+The Java Program (Benchmark.java):
+--------------------------------------------------
 public class Benchmark {
     public static void main(String[] args) {
-        long startTime = System.nanoTime();
-        
+        long startTime = System.currentTimeMillis();
         long sum = 0;
-        long limit = 500000000L; // 500 million iterations
-        for (long i = 1; i <= limit; i++) {
+        for (long i = 1; i <= 500000000L; i++) {
             sum += (i % 10);
         }
-        
-        long endTime = System.nanoTime();
-        double durationSeconds = (endTime - startTime) / 1_000_000_000.0;
-        
-        System.out.println("==========================================");
-        System.out.println("Benchmark Completed Successfully!");
-        System.out.println("Total Sum: " + sum);
-        System.out.println("Execution Time: " + String.format("%.4f", durationSeconds) + " seconds");
-        System.out.println("==========================================");
+        long endTime = System.currentTimeMillis();
+        System.out.println("Sum is: " + sum);
+        System.out.println("Execution Time: " + (endTime - startTime) + " ms");
     }
 }
---------------------------------------------------------------------------------
+--------------------------------------------------
 
-EXECUTION IN UBUNTU VM (TERMINAL):
+TEST 1: RUN IN UBUNTU VM (LINUX)
 1. Open Terminal in Ubuntu (Ctrl + Alt + T).
-2. Check Java installation:
-   $ java -version
-   $ javac -version
-   (If not installed: sudo apt update && sudo apt install -y default-jdk)
-3. Create the Java source file:
-   $ nano Benchmark.java
-   (Paste the Java code above, then press Ctrl + O, Enter, Ctrl + X)
-4. Compile the Java program:
-   $ javac Benchmark.java
-5. Run and measure execution time:
-   $ java Benchmark
-   (Or use the Linux time utility):
-   $ time java Benchmark
-6. Record execution time: e.g., 0.35 seconds to 0.52 seconds.
+2. Type command to create file:
+   nano Benchmark.java
+3. Paste the Java program inside.
+4. Save and Exit:
+   - Press Ctrl + O
+   - Press Enter
+   - Press Ctrl + X
+5. Compile the program:
+   javac Benchmark.java
+6. Run the program:
+   java Benchmark
+   -> Look at the output time: e.g. 350 ms (or 0.35 s)
 
-EXECUTION IN WINDOWS HOST (COMMAND PROMPT / POWERSHELL):
-1. Open Notepad or any text editor on Windows.
-2. Paste the same Java benchmark code and save it as "Benchmark.java" in a folder (e.g., C:\lab\Benchmark.java).
-3. Open Command Prompt (cmd) or PowerShell.
-4. Navigate to the folder:
-   > cd C:\lab
-5. Compile the Java program:
-   > javac Benchmark.java
-6. Run the Java program:
-   > java Benchmark
-7. Record execution time: e.g., 0.28 seconds to 0.32 seconds.
+TEST 2: RUN IN WINDOWS HOST (LAPTOP)
+1. Open Notepad in Windows.
+2. Paste the same Java program inside.
+3. Save it as "Benchmark.java" in any folder (like C:\lab\Benchmark.java).
+4. Open Command Prompt (cmd) in Windows.
+5. Go to your folder:
+   cd C:\lab
+6. Compile the program:
+   javac Benchmark.java
+7. Run the program:
+   java Benchmark
+   -> Look at the output time: e.g. 310 ms (or 0.31 s)
 
-COMPARATIVE ANALYSIS & INFERENCE:
-- Host (Windows bare-metal): ~0.32 s
-- Guest (Ubuntu VM): ~0.35 s - 0.45 s
-- Inference: The physical host executes faster because the VM suffers from hypervisor virtualization
-  overhead (CPU scheduling, context switching between VMM and guest OS, memory page table translation).
+CONCLUSION / INFERENCE:
+Windows Host took 310 ms, while Ubuntu VM took 350 ms.
+Windows is FASTER because it runs directly on hardware (bare-metal), while the VM has
+extra virtualization delay from the hypervisor.
 
+--------------------------------------------------------------------------------
+PART 3: EXPERIMENT 2b - PING TEST (VM-TO-VM AND VM-TO-HOST)
+--------------------------------------------------------------------------------
 
-================================================================================
-PART 2: EXPERIMENT 2b - VM-TO-VM PING & VM-TO-NATIVE (HOST) PING
-================================================================================
 AIM:
-To verify network connectivity and packet transmission between two Virtual Machines (VM-to-VM)
-and between a Virtual Machine and the Host Machine (VM-to-Host) using ICMP ping requests.
+To check if two VMs can talk to each other, and if VM can talk to Windows host using the "ping" command.
 
-PREREQUISITES:
-1. Two Virtual Machines installed in VirtualBox (e.g., VM 1: Ubuntu, VM 2: Kali Linux or Ubuntu 2).
-2. Both VMs configured with "Host-Only Adapter" under the same network subnet (e.g., 192.168.56.0/24).
-3. Firewalls disabled or ICMP Echo Request rules enabled.
+STEP 1: Set Both VMs to Same Network
+1. VM 1 (Ubuntu): Settings -> Network -> Adapter 1 -> "Host-only Adapter".
+2. VM 2 (Kali / Ubuntu 2): Settings -> Network -> Adapter 1 -> "Host-only Adapter".
+3. Start both VMs.
 
---------------------------------------------------------------------------------
-STEP-BY-STEP PROCEDURE (2b):
---------------------------------------------------------------------------------
-
-STEP 1: Configure VirtualBox Network Adapter for Both VMs
-1. In VirtualBox Manager, select VM 1 (Ubuntu) -> Settings -> Network -> Adapter 1.
-   - Attached to: "Host-Only Adapter"
-   - Name: "VirtualBox Host-Only Ethernet Adapter" (or vboxnet0)
-   - Click OK.
-2. Repeat for VM 2 (Kali Linux / Ubuntu 2):
-   - Attached to: "Host-Only Adapter"
-   - Name: "VirtualBox Host-Only Ethernet Adapter"
-   - Click OK.
-3. Power ON both VM 1 and VM 2.
-
-STEP 2: Disable Firewall & Allow ICMP Packets
+STEP 2: Turn OFF Firewall
 1. On VM 1 (Ubuntu):
-   $ sudo ufw disable
-   $ sudo iptables -F
-2. On VM 2 (Kali Linux):
-   $ sudo ufw disable
-   $ sudo iptables -F
-3. On Windows Host:
-   - Open Start -> Search "Windows Defender Firewall with Advanced Security".
-   - Click "Inbound Rules" on the left panel.
-   - Scroll down to "File and Printer Sharing (Echo Request - ICMPv4-In)".
-   - Right-click and choose "Enable Rule" (for both Private and Public profiles).
-   - Alternatively, open PowerShell as Administrator and run:
-     > netsh advfirewall firewall add rule name="Allow ICMPv4" protocol=icmpv4:8,any dir=in action=allow
+   sudo ufw disable
+2. On VM 2 (Kali):
+   sudo ufw disable
+3. On Windows Host (Open cmd as admin):
+   netsh advfirewall set allprofiles state off
+   (Or allow ICMP in Windows Defender Firewall).
 
-STEP 3: Identify IP Addresses
-1. On Windows Host (Open cmd):
-   > ipconfig
-   Look for "Ethernet adapter VirtualBox Host-Only Network":
-   IPv4 Address: 192.168.56.1 (Host IP)
+STEP 3: Check IP Addresses
+1. In VM 1 (Ubuntu):
+   ip a
+   -> Find IP: e.g. 192.168.56.101
+2. In VM 2 (Kali):
+   ip a
+   -> Find IP: e.g. 192.168.56.103
+3. In Windows Host (cmd):
+   ipconfig
+   -> Find VirtualBox Host-Only Ethernet Adapter IP: e.g. 192.168.56.1
 
-2. On VM 1 (Ubuntu Terminal):
-   $ ip a
-   (or ifconfig)
-   Look for interface (e.g., enp0s3 or eth0):
-   IPv4 Address: 192.168.56.101 (VM 1 IP)
+STEP 4: Run Ping Tests (Show to Examiner)
+1. Ping from VM 1 to Host:
+   ping -c 4 192.168.56.1
+   -> 4 packets transmitted, 4 received, 0% packet loss!
 
-3. On VM 2 (Kali Linux Terminal):
-   $ ip a
-   Look for interface (e.g., eth0):
-   IPv4 Address: 192.168.56.103 (VM 2 IP)
+2. Ping from Windows Host to VM 1:
+   ping 192.168.56.101
+   -> Reply received, 0% loss!
 
-STEP 4: Test VM-to-Host (VM-Native) Ping
-1. From VM 1 (Ubuntu) to Windows Host:
-   $ ping -c 4 192.168.56.1
-   Expected Output:
-   64 bytes from 192.168.56.1: icmp_seq=1 ttl=128 time=0.45 ms
-   4 packets transmitted, 4 received, 0% packet loss.
+3. Ping from VM 1 (Ubuntu) to VM 2 (Kali):
+   ping -c 4 192.168.56.103
+   -> 4 packets transmitted, 4 received, 0% packet loss!
 
-2. From Windows Host to VM 1 (Ubuntu):
-   > ping -n 4 192.168.56.101
-   Expected Output:
-   Reply from 192.168.56.101: bytes=32 time<1ms TTL=64
-   Packets: Sent = 4, Received = 4, Lost = 0 (0% loss).
-
-STEP 5: Test VM-to-VM Ping
-1. From VM 1 (Ubuntu - 192.168.56.101) to VM 2 (Kali - 192.168.56.103):
-   $ ping -c 4 192.168.56.103
-   Expected Output:
-   64 bytes from 192.168.56.103: icmp_seq=1 ttl=64 time=0.82 ms
-   4 packets transmitted, 4 received, 0% packet loss.
-
-2. From VM 2 (Kali - 192.168.56.103) to VM 1 (Ubuntu - 192.168.56.101):
-   $ ping -c 4 192.168.56.101
-   Expected Output:
-   64 bytes from 192.168.56.101: icmp_seq=1 ttl=64 time=0.79 ms
-   4 packets transmitted, 4 received, 0% packet loss.
+4. Ping from VM 2 (Kali) to VM 1 (Ubuntu):
+   ping -c 4 192.168.56.101
+   -> 4 packets transmitted, 4 received, 0% packet loss!
 
 --------------------------------------------------------------------------------
-VIVA VOCE QUESTIONS & ANSWERS:
+SUPER SIMPLE VIVA QUESTIONS:
 --------------------------------------------------------------------------------
-Q1: What is the difference between Bridged Adapter and Host-Only Adapter in VirtualBox?
-A1: 
-- Bridged Adapter: Connects the VM directly to the physical network card. The VM receives an IP from the physical router's DHCP server and behaves like a standalone physical device on the LAN.
-- Host-Only Adapter: Creates an isolated internal virtual network accessible only between the host machine and other VMs running on the same host. No outside internet access is provided directly.
+Q1: What is Host-Only Adapter?
+A: It is an internal private network between the host laptop and the virtual machines.
 
-Q2: Why does the Java benchmark execute faster on Windows Host than Ubuntu VM?
-A2: The Host OS runs directly on physical bare-metal hardware. The VM runs on top of the VirtualBox hypervisor, incurring virtualization overhead (CPU instruction emulation/trapping, memory two-dimensional page table walk, context switching).
+Q2: Why is Host faster than VM?
+A: Host runs directly on real hardware. The VM runs on top of software (hypervisor), which adds extra delay.
 
-Q3: What protocol does the ping command utilize?
-A3: Ping uses ICMP (Internet Control Message Protocol), specifically Echo Request (Type 8) and Echo Reply (Type 0) packets.
-
-Q4: What should you check if ping requests timeout between two VMs?
-A4:
-1. Ensure both VMs are configured with the same Host-Only network adapter name.
-2. Verify both VM IPs belong to the same subnet (e.g., 192.168.56.x/24).
-3. Check and disable OS firewalls (`sudo ufw disable` on Linux, enable ICMP Echo Request on Windows Firewall).
+Q3: What protocol does ping command use?
+A: ICMP (Internet Control Message Protocol).
 
 --------------------------------------------------------------------------------
 RESULT:
 --------------------------------------------------------------------------------
-Successfully created the Virtual Machine with dedicated memory, storage, and network
-adapters in Oracle VirtualBox. The performance comparison between Host and Guest was
-measured using a Java benchmark, and bi-directional network connectivity was established
-and verified between VM-to-Host and VM-to-VM using the ping utility with 0% packet loss.
+Virtual machine was created with custom RAM, Disk, and Network. Java benchmark showed
+the host is faster than the VM. Ping tests between VM-to-Host and VM-to-VM succeeded with 0% packet loss.
 ================================================================================

@@ -1,262 +1,176 @@
 ================================================================================
-EXPERIMENT 6: TRANSFER OF FILES FROM ONE VIRTUAL MACHINE TO ANOTHER
-              (UBUNTU VM AND KALI LINUX VM)
+EXPERIMENT 6: FILE TRANSFER BETWEEN TWO VIRTUAL MACHINES (UBUNTU & KALI)
 ================================================================================
 
 AIM:
-To demonstrate and verify the transfer of files between two independent virtual machines
-(Ubuntu VM and Kali Linux VM) across an isolated virtual network using four distinct methods:
-1. Network File System (NFS) Share
-2. Oracle VirtualBox Shared Folders (Host Gateway)
-3. Secure Shell (SSH) and Secure Copy (SCP)
-4. File Transfer Protocol (FTP via vsftpd)
+To send and receive files between Ubuntu VM and Kali Linux VM using NFS, 
+Shared Folders, SSH/SCP, and FTP.
+
+================================================================================
+METHOD 1: NFS (NETWORK FILE SYSTEM) - [MAIN EXAM METHOD]
+================================================================================
+(Ubuntu is the SERVER, Kali is the CLIENT)
 
 --------------------------------------------------------------------------------
-NETWORK TOPOLOGY & PREREQUISITES:
+STEP 1: NETWORK SETUP IN VIRTUALBOX (DO THIS FOR BOTH VMs)
 --------------------------------------------------------------------------------
-VirtualBox Network Adapter Configuration (Apply to BOTH VM 1 and VM 2):
-- Adapter 1: Attached to "Host-Only Adapter" (e.g., VirtualBox Host-Only Ethernet Adapter)
-  Purpose: Enables private high-speed inter-VM communication within subnet 192.168.56.0/24.
-- Adapter 2: Attached to "NAT"
-  Purpose: Provides Internet access for `sudo apt update` and package downloads.
-
-IP Address Verification:
-- Open Terminal on Ubuntu VM (Server):
-  $ ip a
-  Assigned IP: 192.168.56.103 (Example)
-- Open Terminal on Kali VM (Client):
-  $ ip a
-  Assigned IP: 192.168.56.104 (Example)
-- Verify connectivity:
-  $ ping -c 3 192.168.56.103  (from Kali to Ubuntu)
-  $ ping -c 3 192.168.56.104  (from Ubuntu to Kali)
-
-
-================================================================================
-METHOD 1: NFS (NETWORK FILE SYSTEM) SHARE [PRIMARY METHOD]
-================================================================================
-Architecture: Ubuntu acts as NFS Server; Kali acts as NFS Client.
-
-PART A: SETUP NFS SERVER ON UBUNTU VM
-STEP 1: Update package cache and install NFS Server daemon:
-$ sudo apt update
-$ sudo apt install -y nfs-kernel-server
-
-STEP 2: Create the shared directory:
-$ sudo mkdir -p /srv/nfs/sharedfolder
-
-STEP 3: Assign open read/write permissions:
-$ sudo chown nobody:nogroup /srv/nfs/sharedfolder
-$ sudo chmod 777 /srv/nfs/sharedfolder
-
-STEP 4: Configure NFS export table:
-Open the exports configuration file:
-$ sudo nano /etc/exports
-Add the following configuration line at the bottom of the file (replace with your Kali VM IP):
-/srv/nfs/sharedfolder 192.168.56.104(rw,sync,no_subtree_check,no_root_squash)
-(Or allow entire subnet):
-/srv/nfs/sharedfolder 192.168.56.0/24(rw,sync,no_subtree_check,no_root_squash)
-
-Save file: Press Ctrl + O, Enter, then exit with Ctrl + X.
-
-STEP 5: Export shares and restart NFS Service:
-$ sudo exportfs -a
-$ sudo systemctl restart nfs-kernel-server
-$ sudo systemctl status nfs-kernel-server
-
-PART B: SETUP NFS CLIENT ON KALI LINUX VM
-STEP 6: Update package cache and install NFS client utility:
-$ sudo apt update
-$ sudo apt install -y nfs-common
-
-STEP 7: Create a local mount directory:
-$ sudo mkdir -p /mnt/nfs/sharedfolder
-
-STEP 8: Mount the remote NFS share:
-$ sudo mount 192.168.56.103:/srv/nfs/sharedfolder /mnt/nfs/sharedfolder
-
-STEP 9: Verify active mount:
-$ df -h | grep nfs
-$ ls -l /mnt/nfs/sharedfolder
-
-PART C: BIDIRECTIONAL FILE TRANSFER VERIFICATION
-STEP 10: Test Read Operation (Ubuntu -> Kali):
-1. On Ubuntu VM (Server):
-   $ echo "=== Hello from Ubuntu via NFS ===" | sudo tee /srv/nfs/sharedfolder/ubuntu_test.txt
-2. On Kali VM (Client):
-   $ ls -l /mnt/nfs/sharedfolder
-   $ cat /mnt/nfs/sharedfolder/ubuntu_test.txt
-   * Verification: The file created on Ubuntu is immediately visible and readable on Kali!
-
-STEP 11: Test Write Operation (Kali -> Ubuntu):
-1. On Kali VM (Client):
-   $ echo "=== Write test from Kali Linux ===" > /mnt/nfs/sharedfolder/kali_test.txt
-2. On Ubuntu VM (Server):
-   $ ls -l /srv/nfs/sharedfolder
-   $ cat /srv/nfs/sharedfolder/kali_test.txt
-   * Verification: The file written from Kali is immediately visible and verified on Ubuntu!
-
-
-================================================================================
-METHOD 2: VIRTUALBOX HOST SHARED FOLDERS
-================================================================================
-Architecture: Both VMs mount a common folder created on the Windows Host.
-
-STEP 1: Create Shared Folder on Windows Host
-1. Create a directory on Windows: e.g., `C:\VMShared`
-2. Create a test verification file inside it:
-   > echo Host Shared File > C:\VMShared\host_marker.txt
-
-STEP 2: Attach Shared Folder in VirtualBox Manager
-(Perform for BOTH Ubuntu VM and Kali VM):
-1. In VirtualBox Manager, select VM -> Settings -> "Shared Folders".
-2. Click "+" icon:
-   - Folder Path: `C:\VMShared`
-   - Folder Name: `VMShared`
-   - Check "Auto-mount"
-   - Check "Make Permanent"
-3. Click OK -> OK.
-
-STEP 3: Mount and Grant Permissions inside Guest VMs
-1. Boot both VMs.
-2. In VirtualBox VM Window Menu: Devices -> "Insert Guest Additions CD Image..."
-   (Install guest additions if not already installed).
-3. The folder auto-mounts at `/media/sf_VMShared`.
-4. Fix Permission Denied:
-   By default, only users in the `vboxsf` system group can access the shared mount.
-   Run inside each VM:
-   $ sudo usermod -aG vboxsf $USER
-5. Reboot VM to apply group membership:
-   $ sudo reboot
-
-STEP 4: Transfer Files
-1. In Ubuntu VM:
-   $ cp test_file_ubuntu.txt /media/sf_VMShared/
-2. In Kali VM:
-   $ ls -l /media/sf_VMShared/
-   $ cp /media/sf_VMShared/test_file_ubuntu.txt ~/Desktop/
-   * Verification: Files dropped in `/media/sf_VMShared` are instantly synced between both VMs.
-
-
-================================================================================
-METHOD 3: SSH (SECURE SHELL) & SCP (SECURE COPY PROTOCOL)
-================================================================================
-Architecture: Direct encrypted network transfer between VMs over TCP Port 22.
-
-STEP 1: Install and Enable OpenSSH Server on Both VMs
-$ sudo apt update
-$ sudo apt install -y openssh-server
-$ sudo systemctl enable --now ssh
-$ sudo systemctl status ssh
-
-STEP 2: Allow Port 22 in Firewall
-$ sudo ufw allow 22/tcp
-$ sudo ufw reload
-
-STEP 3: Remote Interactive Login via SSH
-From Kali VM, log into Ubuntu VM:
-$ ssh ubuntu@192.168.56.103
-(Enter password -> Shell prompt changes to Ubuntu).
-Type `exit` to return to Kali shell.
-
-STEP 4: File Transfer Using SCP Command
-1. Transfer file from Kali (Client) to Ubuntu (Server):
-   $ scp file_from_kali.txt ubuntu@192.168.56.103:/home/ubuntu/
-
-2. Fetch / Download file from Ubuntu (Server) to Kali (Client):
-   $ scp ubuntu@192.168.56.103:/home/ubuntu/server_report.txt /home/kali/Desktop/
-
-STEP 5: Verify Transferred Files:
-$ ls -lh /home/ubuntu/file_from_kali.txt
-$ cat /home/kali/Desktop/server_report.txt
-
-
-================================================================================
-METHOD 4: FTP (FILE TRANSFER PROTOCOL VIA VSFTPD)
-================================================================================
-Architecture: Ubuntu acts as vsftpd FTP Server; Kali connects as FTP Client.
-
-STEP 1: Install and Configure vsftpd on Ubuntu VM
-1. Install vsftpd:
-   $ sudo apt update
-   $ sudo apt install -y vsftpd
-   $ sudo systemctl enable --now vsftpd
-
-2. Configure `/etc/vsftpd.conf`:
-   $ sudo nano /etc/vsftpd.conf
-   Ensure the following lines are uncommented and set:
-   listen=NO
-   listen_ipv6=YES
-   anonymous_enable=NO
-   local_enable=YES
-   write_enable=YES
-   chroot_local_user=YES
-   allow_writeable_chroot=YES
-
-   Save with Ctrl + O, Enter, Ctrl + X.
-
-3. Restart FTP service:
-   $ sudo systemctl restart vsftpd
-
-4. Allow FTP ports through firewall:
-   $ sudo ufw allow 20/tcp
-   $ sudo ufw allow 21/tcp
-
-STEP 2: Connect from Kali VM using FTP Client
-1. Install FTP client on Kali Linux:
-   $ sudo apt update && sudo apt install -y ftp
-
-2. Connect to Ubuntu FTP Server:
-   $ ftp 192.168.56.103
-   - Name: ubuntu (Enter your Ubuntu username)
-   - Password: <your password>
-   * System output: "230 Login successful."
-
-STEP 3: Execute FTP Transfer Commands
-- Upload file from Kali to Ubuntu:
-  ftp> put test_upload.txt
-  (226 Transfer complete)
-- Download file from Ubuntu to Kali:
-  ftp> get remote_data.txt
-  (226 Transfer complete)
-- List remote files:
-  ftp> ls
-- Terminate FTP session:
-  ftp> bye
-
-STEP 4: Verify Files on Destination:
-$ ls -l remote_data.txt
-
+1. Turn OFF both Ubuntu and Kali VMs.
+2. In VirtualBox, click "Ubuntu VM" -> Click "Settings" (gear icon) -> Click "Network".
+   - Adapter 1: Attached to -> Select "Host-only Adapter".
+   - Adapter 2: Click "Enable Network Adapter" -> Attached to -> Select "NAT".
+   - Click "OK".
+3. Do the EXACT SAME thing for "Kali VM":
+   - Adapter 1: "Host-only Adapter"
+   - Adapter 2: "NAT"
+   - Click "OK".
+4. Now start (Power ON) both Ubuntu and Kali.
 
 --------------------------------------------------------------------------------
-VIVA VOCE QUESTIONS & ANSWERS:
+STEP 2: FIND IP ADDRESS OF BOTH VMs
 --------------------------------------------------------------------------------
-Q1: What is the primary difference between NFS, SCP, and FTP?
-A1:
-- NFS: Protocol that mounts remote directories directly into the local filesystem hierarchy. Files are accessed as if they exist on the local hard drive.
-- SCP: Point-to-point secure file copy utility utilizing SSH encrypted transport (port 22).
-- FTP: Application layer protocol using client-server architecture with separate control (port 21) and data (port 20) channels.
+1. On UBUNTU VM:
+   Open Terminal (Ctrl + Alt + T) and type:
+   ip a
+   -> Look at Adapter 1 (enp0s3). Find your IP: e.g. 192.168.56.103
 
-Q2: What is the meaning of the export parameters (rw, sync, no_subtree_check, no_root_squash)?
-A2:
-- rw: Allows both read and write requests on the exported volume.
-- sync: Writes changes to disk before confirming, ensuring data integrity.
-- no_subtree_check: Prevents subtree checking, improving performance and reliability.
-- no_root_squash: Allows root user on client machine to operate with root permissions on NFS share.
+2. On KALI VM:
+   Open Terminal and type:
+   ip a
+   -> Look at Adapter 1 (eth0). Find your IP: e.g. 192.168.56.104
 
-Q3: Why was it necessary to add the user to the `vboxsf` group in VirtualBox shared folders?
-A3: VirtualBox automounts shared folders under `/media/sf_<name>` with ownership assigned to `root:vboxsf` and permissions 770. Regular users cannot enter or read the directory unless added to the `vboxsf` supplemental group.
+3. Write down both IPs on a paper:
+   - Ubuntu IP = 192.168.56.103
+   - Kali IP   = 192.168.56.104
 
-Q4: Which port numbers are utilized by NFS, SSH, and FTP?
-A4:
-- NFS: TCP/UDP Port 2049 (and rpcbind port 111).
-- SSH / SCP: TCP Port 22.
-- FTP: TCP Port 21 (control commands) and TCP Port 20 (active data transfer).
+--------------------------------------------------------------------------------
+STEP 3: SETUP NFS SERVER ON UBUNTU VM
+--------------------------------------------------------------------------------
+Open Terminal in UBUNTU and run these commands one by one:
+
+1. Update and install NFS Server:
+   sudo apt update
+   sudo apt install nfs-kernel-server -y
+
+2. Create a folder to share:
+   sudo mkdir -p /srv/nfs/sharedfolder
+
+3. Give full permission so Kali can read and write:
+   sudo chmod 777 /srv/nfs/sharedfolder
+
+4. Open the export config file in text editor:
+   sudo nano /etc/exports
+
+5. Inside the editor, use down-arrow key to go to the VERY LAST line, and type:
+   /srv/nfs/sharedfolder *(rw,sync,no_subtree_check,no_root_squash)
+
+6. How to save and exit nano:
+   - Press Ctrl + O
+   - Press Enter
+   - Press Ctrl + X
+
+7. Apply the changes and restart NFS:
+   sudo exportfs -a
+   sudo systemctl restart nfs-kernel-server
+
+--------------------------------------------------------------------------------
+STEP 4: SETUP NFS CLIENT ON KALI LINUX VM
+--------------------------------------------------------------------------------
+Open Terminal in KALI and run these commands one by one:
+
+1. Install NFS Client:
+   sudo apt update
+   sudo apt install nfs-common -y
+
+2. Create a folder where you will view the shared files:
+   sudo mkdir -p /mnt/nfs/sharedfolder
+
+3. Connect (Mount) Ubuntu's shared folder to Kali:
+   (Replace 192.168.56.103 with YOUR Ubuntu IP)
+   sudo mount 192.168.56.103:/srv/nfs/sharedfolder /mnt/nfs/sharedfolder
+
+4. Check if connection is successful:
+   df -h | grep nfs
+   -> If you see Ubuntu's IP listed, it is 100% connected!
+
+--------------------------------------------------------------------------------
+STEP 5: TEST AND SHOW OUTPUT TO EXAMINER (SUCCESS PROOF!)
+--------------------------------------------------------------------------------
+
+TEST A: SEND FILE FROM UBUNTU -> READ IT ON KALI
+1. In UBUNTU Terminal, create a file:
+   echo "Hello Examiner, file sent from Ubuntu" | sudo tee /srv/nfs/sharedfolder/ubuntu_file.txt
+
+2. In KALI Terminal, open and see that file:
+   cat /mnt/nfs/sharedfolder/ubuntu_file.txt
+   -> OUTPUT: Hello Examiner, file sent from Ubuntu
+
+TEST B: CREATE FILE ON KALI -> READ IT ON UBUNTU
+1. In KALI Terminal, write a file:
+   echo "Hello Examiner, file sent from Kali" > /mnt/nfs/sharedfolder/kali_file.txt
+
+2. In UBUNTU Terminal, check if file arrived:
+   cat /srv/nfs/sharedfolder/kali_file.txt
+   -> OUTPUT: Hello Examiner, file sent from Kali
+
+================================================================================
+METHOD 2: SHARED FOLDERS (USING WINDOWS HOST)
+================================================================================
+1. On your Windows desktop, make a new folder: C:\VMShared
+2. Put any text file inside it: test.txt
+3. In VirtualBox: Settings of VM -> Shared Folders -> Click "+" icon.
+   - Folder Path: C:\VMShared
+   - Folder Name: VMShared
+   - Tick "Auto-mount"
+   - Click OK.
+4. Do this for both VMs.
+5. In both VMs, open terminal and type:
+   sudo usermod -aG vboxsf $USER
+   sudo reboot
+6. After restart, open terminal and check:
+   ls /media/sf_VMShared
+   -> You will see test.txt inside both VMs!
+
+================================================================================
+METHOD 3: SSH AND SCP (SECURE COPY)
+================================================================================
+1. On both VMs, install SSH:
+   sudo apt update && sudo apt install openssh-server -y
+2. Send a file from Kali to Ubuntu:
+   (Replace ubuntu_username and 192.168.56.103 with your Ubuntu details)
+   scp myfile.txt ubuntu_username@192.168.56.103:/home/ubuntu_username/
+3. Type Ubuntu password. The file is copied directly!
+
+================================================================================
+METHOD 4: FTP (FILE TRANSFER PROTOCOL)
+================================================================================
+1. On Ubuntu (Server):
+   sudo apt install vsftpd -y
+   sudo nano /etc/vsftpd.conf
+   (Ensure 'write_enable=YES' is set, save with Ctrl+O, Enter, Ctrl+X)
+   sudo systemctl restart vsftpd
+2. On Kali (Client):
+   sudo apt install ftp -y
+   ftp 192.168.56.103
+   (Enter Ubuntu username and password)
+   ftp> put localfile.txt    (Upload file)
+   ftp> get remotefile.txt   (Download file)
+   ftp> bye                  (Exit)
+
+--------------------------------------------------------------------------------
+SIMPLE VIVA QUESTIONS FOR EXAMINER:
+--------------------------------------------------------------------------------
+Q1: What does NFS stand for?
+A: Network File System. It allows one machine to mount and access folders on another machine over the network.
+
+Q2: What port does NFS and SSH use?
+A: NFS uses port 2049. SSH/SCP uses port 22. FTP uses ports 20 and 21.
+
+Q3: What does 'rw' and 'sync' mean in NFS /etc/exports?
+A: 'rw' means Read and Write. 'sync' means write changes to disk immediately.
 
 --------------------------------------------------------------------------------
 RESULT:
 --------------------------------------------------------------------------------
-Bidirectional file transfer between Ubuntu VM and Kali Linux VM was successfully implemented
-and verified across all four methods: NFS network export, VirtualBox Host shared folders,
-SSH/SCP encrypted copy, and FTP client-server protocol.
+File transfer between Ubuntu VM and Kali Linux VM was successfully demonstrated
+using NFS, Shared Folders, SSH/SCP, and FTP without any errors.
 ================================================================================

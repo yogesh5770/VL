@@ -1,110 +1,73 @@
-# Virtualization & Cloud Computing Lab — Model Exam Reference Repository
+# Virtualization Model Lab — Super Easy Step-by-Step Guide
 
-This repository contains complete, tested, step-by-step procedures, terminal commands, configurations, Java benchmark code, and Viva Voce questions for all Model Lab virtualization experiments.
-
----
-
-## 📑 Experiment Quick Index
-
-| Exp No | Topic & Objective | Key Tools / Hypervisors | File Link |
-|---|---|---|---|
-| **2a** | **VM Creation, Resource Allocation & Host vs VM Java Benchmark** | Oracle VirtualBox, Ubuntu, Java JDK | [`EXP_02A_02B.txt`](./EXP_02A_02B.txt) |
-| **2b** | **VM-to-VM Ping & VM-to-Host (Native) ICMP Ping Testing** | VirtualBox Host-Only Adapter, ICMP, ufw | [`EXP_02A_02B.txt`](./EXP_02A_02B.txt) |
-| **3** | **Cold Migration of VM using Export/Import Appliance (OVA)** | Oracle VirtualBox, OVA/OVF, Storage Transfer | [`EXP_03.txt`](./EXP_03.txt) |
-| **4a** | **Citrix XenServer Installation (Bare-Metal Type-1)** | Citrix Hypervisor ISO, BIOS VT-x, xsconsole | [`EXP_04.txt`](./EXP_04.txt) |
-| **4b** | **Live Migration of Running VM using XenCenter GUI** | XenCenter, Shared NFS/iSCSI Storage, Zero Downtime | [`EXP_04.txt`](./EXP_04.txt) |
-| **5a** | **KVM Installation & Virtual Instance Creation** | KVM, QEMU, libvirt, virt-manager, virsh, CirrOS | [`EXP_05.txt`](./EXP_05.txt) |
-| **5b** | **KVM Image Creation from ISO, Image Resizing & Conversion** | `qemu-img`, `growpart`, `resize2fs`, QCOW2/RAW/VDI/VHD | [`EXP_05.txt`](./EXP_05.txt) |
-| **6** | **File Transfer Between VMs (NFS, Shared Folders, SSH/SCP, FTP)** | NFS kernel server, VirtualBox Guest Additions, SCP, vsftpd | [`EXP_06.txt`](./EXP_06.txt) |
+This folder contains easy-to-follow, plain English guides for every single experiment in your Model Lab Exam.
+Even if you are doing this for the first time, just follow **Step 1, Step 2, Step 3** and you will get 100% success!
 
 ---
 
-## 🚀 Quick Execution Cheatsheet for Lab Exam
+## 📑 All Experiment Text Files
 
-### Experiment 2a & 2b: VM Creation, Benchmark & Ping
+1. **[`EXP_02A_02B.txt`](./EXP_02A_02B.txt)**
+   - **2a:** How to create a VM in VirtualBox (RAM, Hard Disk, Network) + Run Java speed test (Windows vs Ubuntu).
+   - **2b:** How to ping between two VMs and ping from VM to Windows Host with 0% packet loss.
+   - **Java Code:** [`Benchmark.java`](./Benchmark.java)
+
+2. **[`EXP_03.txt`](./EXP_03.txt)**
+   - **Cold Migration:** How to move a VM from Computer 1 to Computer 2 using an `.ova` file and a pendrive with zero data loss.
+
+3. **[`EXP_04.txt`](./EXP_04.txt)**
+   - **4a:** How to install Citrix XenServer on a physical server computer.
+   - **4b:** How to do Live Migration of a running VM from Server 1 to Server 2 using XenCenter with 0 downtime.
+
+4. **[`EXP_05.txt`](./EXP_05.txt)**
+   - **5a:** How to install KVM on Linux and create a virtual machine instance with `virt-manager`.
+   - **5b:** How to create a 10 GB disk with `qemu-img`, resize it to 15 GB, and convert it into RAW, VDI, and VHD.
+
+5. **[`EXP_06.txt`](./EXP_06.txt)**
+   - **File Transfer:** How to send and receive files between Ubuntu and Kali using NFS share, Shared Folders, SSH/SCP, and FTP.
+
+---
+
+## 🚀 Quick Command Summary (Copy-Paste Cheatsheet)
+
+### 1. File Transfer (NFS Share)
 ```bash
-# Compile and run Java benchmark in Ubuntu VM:
-javac Benchmark.java
-java Benchmark
-# Alternatively with timing:
-time java Benchmark
-
-# Ping Host and Peer VM:
-sudo ufw disable
-ip a
-ping -c 4 192.168.56.1    # Ping Host Windows
-ping -c 4 192.168.56.103  # Ping Second VM
-```
-
-### Experiment 3: Cold Migration (OVA)
-1. In VM: `echo "Test data" > test.txt` && `sudo shutdown -h now`
-2. VirtualBox: `File -> Export Appliance...` -> Save as `.ova`.
-3. Transfer `.ova` to destination PC via USB.
-4. On Destination: `File -> Import Appliance...` -> Generate new MAC addresses.
-5. Start VM -> `cat test.txt`.
-
-### Experiment 4: XenServer & Live Migration
-- **Hypervisor type**: Xen is Type-1 bare-metal.
-- **Dom0**: Management domain with physical hardware drivers.
-- **Live Migration rule**: Requires Shared Storage (NFS/iSCSI) and identical CPU architecture.
-- In XenCenter: Right-click VM -> `Move VM...` -> Select Destination Host -> Zero downtime ping verification.
-
-### Experiment 5: KVM & Image Operations
-```bash
-# 1. Check CPU hardware virtualization support:
-egrep -c '(vmx|svm)' /proc/cpuinfo
-
-# 2. Install KVM packages & enable daemon:
-sudo apt update && sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virt-manager qemu-utils
-sudo systemctl enable --now libvirtd
-sudo usermod -aG libvirt $USER && sudo usermod -aG kvm $USER
-
-# 3. Create 10GB QCOW2 image:
-qemu-img create -f qcow2 ubuntu_vm.qcow2 10G
-qemu-img info ubuntu_vm.qcow2
-
-# 4. Resize image (+5GB):
-qemu-img resize ubuntu_vm.qcow2 +5G
-
-# 5. Convert QCOW2 to VDI, RAW, VHD:
-qemu-img convert -f qcow2 -O raw ubuntu_vm.qcow2 ubuntu_vm.raw
-qemu-img convert -f qcow2 -O vdi ubuntu_vm.qcow2 ubuntu_vm.vdi
-qemu-img convert -f qcow2 -O vpc ubuntu_vm.qcow2 ubuntu_vm.vhd
-```
-
-### Experiment 6: File Transfer (NFS, SSH/SCP, FTP)
-```bash
-# Method 1: NFS Server (Ubuntu)
-sudo apt install -y nfs-kernel-server
+# On Ubuntu (Server):
+sudo apt install nfs-kernel-server -y
 sudo mkdir -p /srv/nfs/sharedfolder && sudo chmod 777 /srv/nfs/sharedfolder
-echo "/srv/nfs/sharedfolder 192.168.56.0/24(rw,sync,no_subtree_check,no_root_squash)" | sudo tee -a /etc/exports
+echo "/srv/nfs/sharedfolder *(rw,sync,no_subtree_check,no_root_squash)" | sudo tee -a /etc/exports
 sudo exportfs -a && sudo systemctl restart nfs-kernel-server
 
-# Method 1: NFS Client (Kali)
-sudo apt install -y nfs-common
+# On Kali (Client):
+sudo apt install nfs-common -y
 sudo mkdir -p /mnt/nfs/sharedfolder
-sudo mount 192.168.56.103:/srv/nfs/sharedfolder /mnt/nfs/sharedfolder
-
-# Method 3: SCP (Secure Copy)
-scp testfile.txt user@192.168.56.103:/home/user/
+sudo mount <UBUNTU_IP>:/srv/nfs/sharedfolder /mnt/nfs/sharedfolder
 ```
 
----
+### 2. Ping Test (VM-to-VM)
+```bash
+# On both VMs:
+sudo ufw disable
+ip a
+ping -c 4 <OTHER_VM_IP>
+```
 
-## 🎯 Viva High-Yield Top 5 Questions
+### 3. Java Benchmark
+```bash
+javac Benchmark.java
+java Benchmark
+```
 
-1. **Type-1 vs Type-2 Hypervisors**:
-   - Type-1 (Bare-Metal): Runs directly on physical hardware (Xen, KVM, ESXi). High performance.
-   - Type-2 (Hosted): Runs inside a host OS (VirtualBox, VMware Workstation). Higher overhead.
-2. **Cold vs Live Migration**:
-   - Cold: VM is shut down; disks/configs copied. Incurs downtime.
-   - Live: VM remains running; pre-copies RAM pages over network with shared storage. Zero downtime.
-3. **QCOW2 vs RAW**:
-   - QCOW2: Thin provisioning, copy-on-write, snapshots, compression.
-   - RAW: Flat binary, fastest performance, no native snapshots.
-4. **NFS Exports Options**:
-   - `rw`: Read/write access.
-   - `sync`: Synchronous write commit before reply.
-   - `no_root_squash`: Allows remote root client to maintain root privileges on share.
-5. **Why is Bare-Metal Host faster than VM for compute loops?**
-   - VM incurs hypervisor context switching, CPU virtualization traps, and nested page-table translation overhead.
+### 4. KVM Image Operations
+```bash
+# Create 10GB disk:
+qemu-img create -f qcow2 mydisk.qcow2 10G
+
+# Resize (+5GB):
+qemu-img resize mydisk.qcow2 +5G
+
+# Convert to VDI, RAW, VHD:
+qemu-img convert -f qcow2 -O raw mydisk.qcow2 mydisk.raw
+qemu-img convert -f qcow2 -O vdi mydisk.qcow2 mydisk.vdi
+qemu-img convert -f qcow2 -O vpc mydisk.qcow2 mydisk.vhd
+```
