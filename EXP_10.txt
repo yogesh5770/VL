@@ -1,0 +1,199 @@
+================================================================================
+EXPERIMENT 10: CREATION OF VHD ON WINDOWS & RESTORING ON DIFFERENT HOST
+               + STORAGE VIRTUALIZATION (LVM ON LINUX)
+================================================================================
+
+AIM:
+1. To create a Virtual Hard Disk (VHD) on Windows, store test data, and attach/restore
+   the same VHD on a different host machine.
+2. To perform Storage Virtualization on Linux by adding a new virtual disk and dynamically
+   expanding the storage space using Logical Volume Manager (LVM: pvcreate, vgextend, lvextend, resize2fs).
+
+================================================================================
+PART 1: CREATION OF VHD ON WINDOWS & RESTORING ON DIFFERENT HOST
+================================================================================
+
+WHAT IS A VHD?
+A Virtual Hard Disk (VHD) is a single file (e.g. `mydata.vhd` or `mydata.vhdx`) that
+acts like a real physical hard drive. You can format it, save files inside it, and attach
+it to any computer.
+
+--------------------------------------------------------------------------------
+PHASE 1: CREATE VHD ON COMPUTER 1 (SOURCE HOST)
+--------------------------------------------------------------------------------
+STEP 1: Open Disk Management
+- Press the Windows key + R (Run dialog).
+- Type: `diskmgmt.msc` and press Enter.
+
+STEP 2: Create the VHD File
+- In the top menu bar, click "Action" -> Click "Create VHD".
+- Location: Click "Browse" and choose where to save (e.g. `C:\my_virtual_disk.vhdx`).
+- Virtual hard disk size: Enter `5 GB` (or `10 GB`).
+- Virtual hard disk format: Choose "VHDX" (or VHD).
+- Virtual hard disk type: Choose "Dynamically expanding" (saves disk space).
+- Click "OK".
+
+STEP 3: Initialize the Disk
+- Look at the bottom list in Disk Management. You will see a new disk showing "Not Initialized".
+- Right-click the disk name (e.g. Disk 2) -> Click "Initialize Disk".
+- Choose "GPT" (or MBR) -> Click "OK".
+
+STEP 4: Create a New Volume (Format Drive)
+- Right-click the black bar that says "Unallocated" space -> Click "New Simple Volume...".
+- Click Next -> Next -> Assign a drive letter (e.g. `E:` or `F:`).
+- File system: Choose "NTFS" -> Volume label: "VHD_Store" -> Click Finish.
+- Now you have a new drive on your computer (Drive E:).
+
+STEP 5: Put Secret Test Data Inside the VHD (Proof of Restoration!)
+- Open "This PC" -> Open your new drive `E:`.
+- Create a text file named `proof.txt` with content:
+  "VHD Migration Successful - All Data Preserved 2026"
+- Save and close the file.
+
+STEP 6: Detach (Unplug) the VHD File
+- Go back to Disk Management (`diskmgmt.msc`).
+- Right-click the disk header (Disk 2) -> Click "Detach VHD".
+- Click "OK" (Do NOT check the delete box!).
+- The drive disappears from Windows, safely saved as `C:\my_virtual_disk.vhdx`.
+
+--------------------------------------------------------------------------------
+PHASE 2: RESTORE / ATTACH VHD ON COMPUTER 2 (DESTINATION HOST)
+--------------------------------------------------------------------------------
+STEP 7: Transfer the File
+- Copy `my_virtual_disk.vhdx` to Computer 2 via USB pendrive, network share, or Python HTTP server:
+  `python -m http.server 8000`
+
+STEP 8: Attach the VHD on Computer 2
+- On Computer 2: Press Windows key + R -> Type: `diskmgmt.msc` -> Press Enter.
+- Click top menu: "Action" -> Click "Attach VHD".
+- Browse and select the transferred `my_virtual_disk.vhdx` file.
+- Click "OK".
+
+STEP 9: Verify the Restored Data!
+- Open "This PC" on Computer 2.
+- The virtual drive appears with the same drive letter and name!
+- Open `proof.txt`:
+  -> "VHD Migration Successful - All Data Preserved 2026"
+* Success! All data restored without any corruption!
+
+
+================================================================================
+PART 2: STORAGE VIRTUALIZATION USING LVM ON LINUX (EXTENDING DISK)
+================================================================================
+
+WHAT IS LVM?
+Logical Volume Manager (LVM) pools multiple physical disks into a single large storage
+pool and lets you resize hard drive partitions on the fly without rebooting or unmounting!
+
+Key LVM Hierarchy:
+1. PV (Physical Volume) : Raw hard drive or partition (/dev/sdb).
+2. VG (Volume Group)    : Storage pool combining PVs (ubuntu-vg).
+3. LV (Logical Volume)  : Virtual partition where files live (/dev/ubuntu-vg/root).
+
+--------------------------------------------------------------------------------
+STEP 1: ADD A SECOND HARD DISK TO LINUX VM IN VIRTUALBOX
+--------------------------------------------------------------------------------
+1. Turn OFF your Ubuntu VM.
+2. In VirtualBox: Select VM -> Click "Settings" -> Click "Storage".
+3. Under "Controller: SATA", click the "Adds hard disk" icon (disk with green plus).
+4. Click "Create" -> VDI -> Dynamically allocated -> Size: `7 GB` -> Finish.
+5. Click "OK".
+6. Turn ON the Ubuntu VM and open Terminal.
+
+--------------------------------------------------------------------------------
+STEP 2: INSPECT EXISTING DISKS AND LVM STRUCTURE
+--------------------------------------------------------------------------------
+Open Terminal (Ctrl + Alt + T) in Ubuntu:
+
+$ sudo fdisk -l
+-> Notice your original disk is `/dev/sda` and your new second disk is `/dev/sdb` (7 GB).
+
+Check current LVM configuration:
+$ sudo pvdisplay     # Shows Physical Volumes
+$ sudo vgdisplay     # Shows Volume Group Name (e.g. ubuntu-vg)
+$ sudo lvdisplay     # Shows Logical Volume Path (e.g. /dev/ubuntu-vg/root or /dev/ubuntu-vg/ubuntu-lv)
+
+Check current free disk space:
+$ df -h /
+-> Note down the current size of `/`: e.g. 10 GB.
+
+--------------------------------------------------------------------------------
+STEP 3: INITIALIZE NEW DISK AS PHYSICAL VOLUME (PVCREATE)
+--------------------------------------------------------------------------------
+Prepare `/dev/sdb` for LVM usage:
+$ sudo pvcreate /dev/sdb
+* Output: Physical volume "/dev/sdb" successfully created.
+
+--------------------------------------------------------------------------------
+STEP 4: EXTEND THE VOLUME GROUP (VGEXTEND)
+--------------------------------------------------------------------------------
+Add the new disk into your existing Volume Group:
+(Replace `ubuntu-vg` with your Volume Group name from vgdisplay)
+
+$ sudo vgextend ubuntu-vg /dev/sdb
+* Output: Volume group "ubuntu-vg" successfully extended.
+
+Verify free space is now available in the Volume Group:
+$ sudo vgdisplay
+
+--------------------------------------------------------------------------------
+STEP 5: EXTEND THE LOGICAL VOLUME (LVEXTEND)
+--------------------------------------------------------------------------------
+Add +3 GB (or all available space) to your root partition:
+$ sudo lvextend -L +3G /dev/ubuntu-vg/root
+(Or if your LV is named ubuntu-lv):
+$ sudo lvextend -L +3G /dev/mapper/ubuntu--vg-ubuntu--lv
+
+* Output: Logical volume root successfully resized.
+
+--------------------------------------------------------------------------------
+STEP 6: RESIZE THE FILESYSTEM ONLINE (RESIZE2FS)
+--------------------------------------------------------------------------------
+Now expand the filesystem so Linux actually sees and uses the new 3 GB:
+
+For ext4 filesystem:
+$ sudo resize2fs /dev/ubuntu-vg/root
+(Or for mapper path):
+$ sudo resize2fs /dev/mapper/ubuntu--vg-root
+
+*(Note: If your system uses XFS filesystem, run: `sudo xfs_growfs /`)*
+
+--------------------------------------------------------------------------------
+STEP 7: VERIFY EXPANDED DISK SPACE (SHOW EXAMINER!)
+--------------------------------------------------------------------------------
+$ df -h /
+
+* OBSERVE OUTPUT:
+  Filesystem                     Size  Used  Avail Use% Mounted on
+  /dev/mapper/ubuntu--vg-root    13G   4.2G  8.2G  35%  /
+
+Success! The root partition expanded from 10 GB to 13 GB (+3 GB) live without rebooting!
+
+--------------------------------------------------------------------------------
+SUPER SIMPLE VIVA QUESTIONS:
+--------------------------------------------------------------------------------
+Q1: What is the difference between VHD and VHDX?
+A: VHD supports disk sizes up to 2 TB. VHDX supports sizes up to 64 TB and includes
+resilience against power failure corruption.
+
+Q2: What is Storage Virtualization?
+A: The pooling of multiple physical storage devices into what appears to be a single,
+flexible virtual storage device that can be easily scaled and managed.
+
+Q3: What are the three layers of LVM?
+A:
+1. PV (Physical Volume) : Physical block devices (e.g. /dev/sdb).
+2. VG (Volume Group)    : A storage pool composed of one or more PVs.
+3. LV (Logical Volume)  : Slices carved out of a VG used as filesystems.
+
+Q4: What is the purpose of `resize2fs` after `lvextend`?
+A: `lvextend` increases the size of the underlying virtual block device, but `resize2fs`
+is required to expand the filesystem tables so the OS can store files in the new space.
+
+--------------------------------------------------------------------------------
+RESULT:
+--------------------------------------------------------------------------------
+A Virtual Hard Disk (VHD) was successfully created on Windows and restored on a separate host
+with zero data loss. Storage virtualization was implemented on Linux using LVM, dynamically
+expanding the root filesystem by 3 GB online without system downtime.
+================================================================================

@@ -1,0 +1,196 @@
+================================================================================
+EXPERIMENT 9: NETWORK VIRTUALIZATION - OPEN VSWITCH (OVS) & LINUX BRIDGE
+================================================================================
+
+AIM:
+To understand and implement Network Virtualization on Linux by configuring:
+1. A Layer-2 Linux Bridge using bridge-utils.
+2. Open vSwitch (OVS) with isolated network namespaces (VRF1 and VRF2) and Virtual
+   Ethernet (veth) cable pairs to achieve inter-namespace ping communication.
+
+--------------------------------------------------------------------------------
+CORE CONCEPTS (UNDERSTAND IN 1 MINUTE):
+--------------------------------------------------------------------------------
+1. What is a Virtual Switch?
+   Just like a physical hardware switch sitting in your college lab connecting different
+   computers with cables, a software/virtual switch runs inside your OS to connect
+   different Virtual Machines or isolated network containers.
+2. Linux Bridge:
+   A built-in Linux kernel switch operating at Layer 2 (MAC address level).
+3. Open vSwitch (OVS):
+   An advanced, enterprise-grade programmable software switch supporting SDN (Software
+   Defined Networking), OpenFlow rules, VLAN tags, and tunneling.
+4. Network Namespaces (VRF):
+   Separate virtual rooms inside Linux with their own private IP addresses and routing tables.
+5. Virtual Ethernet (veth) Pairs:
+   A virtual Ethernet wire with two ends: what goes in one end comes out the other end!
+
+================================================================================
+PART 1: LINUX BRIDGE CONFIGURATION
+================================================================================
+
+Open Terminal in Ubuntu (Ctrl + Alt + T) as root (or use sudo):
+
+STEP 1: Install Bridge Utilities
+$ sudo apt update
+$ sudo apt install -y bridge-utils
+
+STEP 2: Load Required Linux Kernel Modules
+$ sudo modprobe bridge
+$ sudo modprobe br_netfilter
+
+STEP 3: Create the Linux Bridge (br0)
+$ sudo ip link add name br0 type bridge
+$ sudo ip link set br0 up
+
+(Alternatively using legacy brctl commands):
+$ sudo brctl addbr br0
+$ sudo ip link set br0 up
+
+STEP 4: Verify the Bridge is Created
+$ brctl show
+(Or):
+$ ip link show type bridge
+* Expected Output: You will see bridge `br0` with state UP!
+
+STEP 5: (Optional) Attach a Network Interface to the Bridge
+$ sudo ip link set eth1 master br0
+(Or: sudo brctl addif br0 eth1)
+
+
+================================================================================
+PART 2: OPEN VSWITCH (OVS) WITH NETWORK NAMESPACES [MAIN EXAM TOPIC]
+================================================================================
+Topology:
+ [VRF1 Namespace (10.0.0.1)] --- (veth1 === veth2) ---> [ OVS BRIDGE ] <--- (veth4 === veth3) --- [VRF2 Namespace (10.0.0.2)]
+
+--------------------------------------------------------------------------------
+STEP 1: INSTALL OPEN VSWITCH
+--------------------------------------------------------------------------------
+$ sudo apt update
+$ sudo apt install -y openvswitch-switch
+
+Check if the OVS service is running:
+$ sudo systemctl status openvswitch-switch
+(If inactive, start it):
+$ sudo systemctl enable --now openvswitch-switch
+
+--------------------------------------------------------------------------------
+STEP 2: CREATE TWO ISOLATED NETWORK NAMESPACES (ROOM 1 & ROOM 2)
+--------------------------------------------------------------------------------
+$ sudo ip netns add VRF1
+$ sudo ip netns add VRF2
+
+Verify the namespaces exist:
+$ ip netns list
+* Output shows: VRF2, VRF1.
+
+--------------------------------------------------------------------------------
+STEP 3: CREATE VIRTUAL ETHERNET (VETH) WIRE PAIRS
+--------------------------------------------------------------------------------
+We create two virtual cables:
+Cable 1 has two ends: veth1 and veth2
+Cable 2 has two ends: veth3 and veth4
+
+$ sudo ip link add veth1 type veth peer name veth2
+$ sudo ip link add veth3 type veth peer name veth4
+
+--------------------------------------------------------------------------------
+STEP 4: PLUG ONE END OF EACH CABLE INTO THE NAMESPACES
+--------------------------------------------------------------------------------
+Put veth1 inside VRF1:
+$ sudo ip link set veth1 netns VRF1
+
+Put veth3 inside VRF2:
+$ sudo ip link set veth3 netns VRF2
+
+--------------------------------------------------------------------------------
+STEP 5: CREATE OVS BRIDGE AND PLUG THE OTHER ENDS INTO THE SWITCH
+--------------------------------------------------------------------------------
+1. Create the Open vSwitch bridge named `br-ovs`:
+   $ sudo ovs-vsctl add-br br-ovs
+
+2. Plug veth2 into the switch:
+   $ sudo ovs-vsctl add-port br-ovs veth2
+
+3. Plug veth4 into the switch:
+   $ sudo ovs-vsctl add-port br-ovs veth4
+
+4. Turn on all switch ports and the bridge:
+   $ sudo ip link set veth2 up
+   $ sudo ip link set veth4 up
+   $ sudo ip link set br-ovs up
+
+5. Check the OVS Switch configuration (Show to Examiner!):
+   $ sudo ovs-vsctl show
+* Output displays:
+   Bridge br-ovs
+       Port veth2
+           Interface veth2
+       Port veth4
+           Interface veth4
+       Port br-ovs
+           Interface br-ovs
+           type: internal
+
+--------------------------------------------------------------------------------
+STEP 6: ASSIGN IP ADDRESSES INSIDE NAMESPACES AND ACTIVATE
+--------------------------------------------------------------------------------
+1. In Namespace VRF1: Set IP 10.0.0.1
+   $ sudo ip netns exec VRF1 ip addr add 10.0.0.1/24 dev veth1
+   $ sudo ip netns exec VRF1 ip link set veth1 up
+   $ sudo ip netns exec VRF1 ip link set lo up
+
+2. In Namespace VRF2: Set IP 10.0.0.2
+   $ sudo ip netns exec VRF2 ip addr add 10.0.0.2/24 dev veth3
+   $ sudo ip netns exec VRF2 ip link set veth3 up
+   $ sudo ip netns exec VRF2 ip link set lo up
+
+--------------------------------------------------------------------------------
+STEP 7: TEST AND VERIFY PING (SUCCESS PROOF!)
+--------------------------------------------------------------------------------
+Ping from Namespace VRF1 (10.0.0.1) across the OVS Bridge to Namespace VRF2 (10.0.0.2):
+
+$ sudo ip netns exec VRF1 ping -c 4 10.0.0.2
+
+* EXPECTED OUTPUT:
+  64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=0.082 ms
+  64 bytes from 10.0.0.2: icmp_seq=2 ttl=64 time=0.045 ms
+  4 packets transmitted, 4 received, 0% packet loss!
+
+Ping from Namespace VRF2 back to VRF1:
+$ sudo ip netns exec VRF2 ping -c 4 10.0.0.1
+* Output: 0% packet loss!
+
+--------------------------------------------------------------------------------
+STEP 8: CHECK MAC ADDRESS TABLE (OPTIONAL EXAMINER SHOWCASE)
+--------------------------------------------------------------------------------
+$ sudo ovs-appctl fdb/show br-ovs
+$ sudo ip netns exec VRF1 ip link show veth1
+-> Observe that the port MAC address matches the OVS forwarding table entries!
+
+--------------------------------------------------------------------------------
+SUPER SIMPLE VIVA QUESTIONS:
+--------------------------------------------------------------------------------
+Q1: What is the difference between a Linux Bridge and Open vSwitch (OVS)?
+A: Linux Bridge is a basic Layer-2 kernel switch. Open vSwitch (OVS) is an advanced,
+programmable software switch supporting OpenFlow protocols, SDN controllers, VLANs, and NetFlow.
+
+Q2: What is a network namespace?
+A: An isolated instance of the Linux network stack (with its own interfaces, routing tables,
+and firewall rules). It acts like an independent virtual router or machine inside Linux.
+
+Q3: What is a `veth` pair?
+A: Virtual Ethernet cable. It acts like a two-ended bi-directional virtual network cable
+used to link namespaces to bridges.
+
+Q4: What command checks the current Open vSwitch bridge layout?
+A: `ovs-vsctl show`.
+
+--------------------------------------------------------------------------------
+RESULT:
+--------------------------------------------------------------------------------
+Network virtualization was successfully implemented using Linux Bridge and Open vSwitch (OVS).
+Isolated network namespaces were linked through virtual ethernet interfaces and verified
+using bidirectional ping communication with 0% packet loss.
+================================================================================
